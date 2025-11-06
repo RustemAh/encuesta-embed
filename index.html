@@ -42,7 +42,7 @@
       <h2>Presidencial Chile 2025 — Nacional</h2>
       <div class="ts" id="ts">—</div>
     </div>
-    <div class="banner">CANDIDATURAS QUE PASAN A SEGUNDA VUELTA ✓</div>
+    <div id="banner" class="banner">CANDIDATURAS QUE PASAN A SEGUNDA VUELTA ✓</div>
 
     <div class="table-wrap">
       <table class="tbl">
@@ -136,6 +136,10 @@
       tbody.innerHTML = "";
       let total = 0;
 
+      // Mostrar/ocultar banner según allZero
+      const banner = document.getElementById("banner");
+      banner.style.display = allZero ? "none" : "block";
+
       others.forEach(r=>{
         total += (r.votes||0);
         const color = colorForRow(r);
@@ -205,4 +209,5 @@
   </script>
 </body>
 </html>
+
 
