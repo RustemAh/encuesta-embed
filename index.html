@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Encuesta / Resultados</title>
   <style>
-    /* Estilos simples para que se vea bien dentro del iframe */
     :root { color-scheme: light; }
     body { margin:0; font-family: Arial, Roboto, sans-serif; background:#fff; }
     .wrap { max-width: 720px; margin: 0 auto; border:1px solid #ddd; border-radius:10px; overflow:hidden; }
@@ -21,79 +20,123 @@
     .bar-fill { height:10px; border-radius:6px; }
     .note { padding:10px 18px; color:#6b7280; font-size:12px; border-top:1px solid #eee; }
     .total { background:#fafafa; font-weight:700; }
-    @media (max-width:640px){
-      .bar-rail { width:120px; }
-    }
+    .winner { background:#F3F8FF; }
+    @media (max-width:640px){ .bar-rail { width:120px; } }
   </style>
 </head>
 <body>
   <div class="wrap" role="group" aria-label="Resultados - Proyectado ganador">
-    <div class="hd"><h2>Nacional</h2></div>
-    <div class="banner">PROJECTED WINNER ✓</div>
+    <div class="hd"><h2>Presidencial Chile 2025 — Nacional</h2></div>
+    <div class="banner">PROYECTADO GANADOR ✓</div>
 
-    <table class="tbl" aria-describedby="legend">
+    <table class="tbl">
       <thead>
         <tr class="th">
-          <th style="text-align:left; padding:10px 18px;">Candidato</th>
-          <th style="text-align:center; padding:10px 0;">Partido</th>
+          <th style="text-align:left; padding:10px 18px;">Candidatura</th>
+          <th style="text-align:center; padding:10px 0;">Lista</th>
           <th style="text-align:right; padding:10px 18px;">Votos</th>
           <th style="text-align:right; padding:10px 18px;">Porcentaje</th>
         </tr>
       </thead>
-      <tbody>
-        <!-- Fila 1 -->
-        <tr class="row" style="background:#F3F8FF;">
-          <td style="padding:10px 18px;">Zorhan Mamdani ✓</td>
-          <td style="text-align:center;"><span class="party D">D</span></td>
-          <td style="text-align:right; padding:10px 18px;">1.036.051</td>
-          <td style="text-align:right; padding:10px 18px;">
-            <div style="display:inline-flex; gap:10px; align-items:center;">
-              <div class="bar-rail">
-                <div class="bar-fill" style="width:50.4%; background:#0A66C2;"></div>
-              </div>
-              <strong>50.4%</strong>
-            </div>
-          </td>
-        </tr>
-        <!-- Fila 2 -->
-        <tr class="row">
-          <td style="padding:10px 18px;">Andrew Cuomo</td>
-          <td style="text-align:center;"><span class="party O">O</span></td>
-          <td style="text-align:right; padding:10px 18px;">854.995</td>
-          <td style="text-align:right; padding:10px 18px;">
-            <div style="display:inline-flex; gap:10px; align-items:center;">
-              <div class="bar-rail">
-                <div class="bar-fill" style="width:41.6%; background:#6b7280;"></div>
-              </div>
-              <strong>41.6%</strong>
-            </div>
-          </td>
-        </tr>
-        <!-- Fila 3 -->
-        <tr class="row">
-          <td style="padding:10px 18px;">Franco Parisi</td>
-          <td style="text-align:center;"><span class="Partido PDG">R</span></td>
-          <td style="text-align:right; padding:10px 18px;">146.137</td>
-          <td style="text-align:right; padding:10px 18px;">
-            <div style="display:inline-flex; gap:10px; align-items:center;">
-              <div class="bar-rail">
-                <div class="bar-fill" style="width:7.1%; background:#D21F3C;"></div>
-              </div>
-              <strong>7.1%</strong>
-            </div>
-          </td>
-        </tr>
-        <!-- Totales -->
+      <tbody id="rows"></tbody>
+      <tfoot>
         <tr class="row total">
           <td style="padding:12px 18px; color:#6b7280; font-weight:400;">Total</td>
           <td></td>
-          <td style="text-align:right; padding:12px 18px;">2.055.921</td>
+          <td id="totalVotes" style="text-align:right; padding:12px 18px;">—</td>
           <td></td>
         </tr>
-      </tbody>
+      </tfoot>
     </table>
 
-    <div id="legend" class="note">93.5% expected votes in (Est. remaining 145,000)</div>
+    <div class="note" id="footnote">Actualiza cada 60s</div>
   </div>
+
+  <script>
+    // === CONFIGURA AQUÍ ===
+    // Opción Google Sheets (Archivo → Publicar en la web → CSV):
+    // const DATA_URL = "https://docs.google.com/spreadsheets/d/ID/export?format=csv";
+    // Opción GitHub RAW (mismo repo): sube data.csv a la raíz y usa su raw URL:
+    // const DATA_URL = "https://raw.githubusercontent.com/noticiasvalpo-creator/encuesta-embed/main/data.csv";
+    const DATA_URL = "https://raw.githubusercontent.com/noticiasvalpo-creator/encuesta-embed/main/data.csv";
+
+    const REFRESH_MS = 60000; // 60s
+
+    async function fetchCSV(url){
+      const bust = url.includes("?") ? "&" : "?";
+      const res = await fetch(url + bust + "t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("No se pudo cargar CSV");
+      return await res.text();
+    }
+
+    function parseCSV(text){
+      const lines = text.trim().split(/\r?\n/);
+      const headers = lines.shift().split(",").map(h=>h.trim());
+      return lines.map(line=>{
+        // Se permite coma decimal en percent: "50,4" -> 50.4
+        const cols = line.split(",").map(c=>c.trim());
+        const obj = {};
+        headers.forEach((h,i)=> obj[h] = cols[i] ?? "");
+        obj.votes   = Number(String(obj.votes).replace(/\./g,""));
+        obj.percent = Number(String(obj.percent).replace(",","."));
+        obj.highlight = String(obj.highlight).toLowerCase()==="true";
+        return obj;
+      });
+    }
+
+    function formatInt(n){
+      return (n||0).toLocaleString("es-CL");
+    }
+
+    function render(rows){
+      // Ordenar por votos (desc)
+      rows.sort((a,b)=> (b.votes||0) - (a.votes||0));
+      const tbody = document.getElementById("rows");
+      tbody.innerHTML = "";
+      let total = 0;
+
+      rows.forEach((r,idx)=>{
+        total += (r.votes||0);
+        const tr = document.createElement("tr");
+        tr.className = "row" + (r.highlight || idx===0 ? " winner" : "");
+        tr.innerHTML = `
+          <td style="padding:10px 18px;">${idx===0 ? "<b>"+r.candidate+"</b>" : r.candidate}</td>
+          <td style="text-align:center;"><span class="party ${r.party||'O'}">${r.party||'O'}</span></td>
+          <td style="text-align:right; padding:10px 18px;">${formatInt(r.votes||0)}</td>
+          <td style="text-align:right; padding:10px 18px;">
+            <div style="display:inline-flex; gap:10px; align-items:center;">
+              <div class="bar-rail"><div class="bar-fill" style="width:${Math.max(0, Math.min(100, r.percent||0))}%; background:${partyColor(r.party)};"></div></div>
+              <strong>${(r.percent||0).toFixed(1)}%</strong>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById("totalVotes").textContent = formatInt(total);
+    }
+
+    function partyColor(p){
+      if (p==="D") return "#0A66C2";
+      if (p==="R") return "#D21F3C";
+      return "#6b7280";
+    }
+
+    async function load(){
+      try{
+        const text = await fetchCSV(DATA_URL);
+        const rows = parseCSV(text);
+        render(rows);
+        document.getElementById("footnote").textContent = "Actualiza cada " + (REFRESH_MS/1000) + "s · Fuente: CSV";
+      }catch(e){
+        document.getElementById("footnote").textContent = "Error cargando CSV";
+        console.error(e);
+      }
+    }
+
+    load();
+    setInterval(load, REFRESH_MS);
+  </script>
 </body>
 </html>
+
