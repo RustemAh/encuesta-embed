@@ -26,12 +26,12 @@
   </style>
 </head>
 <body>
-  <div class="wrap" role="group" aria-label="Resultados - Proyectados ganadores">
+  <div class="wrap" role="group" aria-label="Resultados - Segunda vuelta">
     <div class="hd">
       <h2>Presidencial Chile 2025 — Nacional</h2>
       <div class="ts" id="ts">—</div>
     </div>
-    <div class="banner">PROYECTADOS GANADORES ✓</div>
+    <div class="banner">CANDIDATURAS QUE PASAN A SEGUNDA VUELTA ✓</div>
 
     <table class="tbl">
       <thead>
@@ -57,11 +57,9 @@
   </div>
 
   <script>
-    // ===== CONFIGURACIÓN =====
     const DATA_URL = "https://docs.google.com/spreadsheets/d/1e1hdX19TAZIiOnTfPgcCmfOh0HujEHWNEYn5WBiAFz8/export?format=csv";
     const REFRESH_MS = 60000;
 
-    // Colores por candidato (prioridad sobre party)
     const candidateColorMap = {
       "José Antonio Kast": "#005CA9",
       "Evelyn Matthei": "#009688",
@@ -76,8 +74,6 @@
 
     function colorForRow(r){
       if (r && r.candidate && candidateColorMap[r.candidate]) return candidateColorMap[r.candidate];
-      if (r && r.party === "D") return "#0A66C2";
-      if (r && r.party === "R") return "#D21F3C";
       return "#6b7280";
     }
 
@@ -87,32 +83,15 @@
       return d.toLocaleString("es-CL", { dateStyle:"medium", timeStyle:"short" });
     }
 
-    // Parser CSV robusto (comillas/commas)
     function parseCSV(text){
-      const rows = [];
-      let cur = [], field = "", inQuotes = false;
-      for (let i=0; i<text.length; i++){
-        const c = text[i], n = text[i+1];
-        if (inQuotes){
-          if (c === '"' && n === '"'){ field += '"'; i++; }
-          else if (c === '"'){ inQuotes = false; }
-          else { field += c; }
-        } else {
-          if (c === '"'){ inQuotes = true; }
-          else if (c === ','){ cur.push(field); field=""; }
-          else if (c === '\n'){ cur.push(field); rows.push(cur); cur=[]; field=""; }
-          else if (c === '\r'){ /* skip */ }
-          else { field += c; }
-        }
-      }
-      if (field.length || cur.length) { cur.push(field); rows.push(cur); }
-      const header = rows.shift().map(h=>h.trim());
-      return rows.filter(r=>r.some(x=>String(x).trim()!=="")).map(r=>{
+      const lines = text.trim().split(/\r?\n/);
+      const headers = lines.shift().split(",").map(h=>h.trim());
+      return lines.map(line=>{
+        const cols = line.split(",").map(c=>c.trim());
         const obj = {};
-        header.forEach((h,i)=> obj[h]= (r[i] ?? "").trim());
-        obj.votes = obj.votes ? Number(String(obj.votes).replace(/\./g,"").replace(/ /g,"")) : 0;
+        headers.forEach((h,i)=> obj[h]=cols[i] ?? "");
+        obj.votes = obj.votes ? Number(String(obj.votes).replace(/\./g,"")) : 0;
         obj.percent = obj.percent ? Number(String(obj.percent).replace(",", ".")) : 0;
-        obj.highlight = String(obj.highlight).toLowerCase()==="true";
         return obj;
       });
     }
@@ -125,34 +104,27 @@
     }
 
     function render(rows){
-      // Orden por percent desc (si empatan, por votos desc)
-      rows.sort((a,b)=> (b.percent||0)-(a.percent||0) || (b.votes||0)-(a.votes||0));
+      const blanco = rows.find(r => r.candidate.toLowerCase().includes("voto nulo"));
+      const others = rows.filter(r => !r.candidate.toLowerCase().includes("voto nulo"));
+      others.sort((a,b)=> (b.percent||0)-(a.percent||0));
+      const topTwo = others.slice(0,2).map(r=>r.candidate);
 
       const tbody = document.getElementById("rows");
       tbody.innerHTML = "";
       let total = 0;
 
-      // Top 2 más votados (por porcentaje)
-      const topTwo = rows.slice(0,2).map(r => r.candidate);
-
-      rows.forEach(r=>{
+      others.forEach(r=>{
         total += (r.votes||0);
         const color = colorForRow(r);
         const pct = Math.max(0, Math.min(100, Number(r.percent)||0));
-        const isProjected = topTwo.includes(r.candidate);
-
+        const pasa = topTwo.includes(r.candidate);
         const tr = document.createElement("tr");
-        tr.className = "row" + (isProjected ? " winner" : "");
-
-        const nameCell = `
-          <td style="padding:10px 18px;">
-            ${isProjected ? "<b>"+(r.candidate||"")+"</b>" : (r.candidate||"")}
-            ${isProjected ? `<span class="chip-winner" aria-label="Proyectado ganador">✓ Proyectado ganador</span>` : ""}
-          </td>
-        `;
-
+        tr.className = "row" + (pasa ? " winner" : "");
         tr.innerHTML = `
-          ${nameCell}
+          <td style="padding:10px 18px;">
+            ${pasa ? "<b>"+r.candidate+"</b>" : r.candidate}
+            ${pasa ? `<span class='chip-winner'>✓ Pasa a segunda vuelta</span>` : ""}
+          </td>
           <td style="text-align:center;"><span class="party-badge" style="background:${color};">${r.party || "O"}</span></td>
           <td style="text-align:right; padding:10px 18px;">${r.votes ? formatInt(r.votes) : "—"}</td>
           <td style="text-align:right; padding:10px 18px;">
@@ -160,10 +132,27 @@
               <div class="bar-rail"><div class="bar-fill" style="width:${pct}%; background:${color};"></div></div>
               <strong>${pct.toFixed(1)}%</strong>
             </div>
-          </td>
-        `;
+          </td>`;
         tbody.appendChild(tr);
       });
+
+      if (blanco) {
+        const color = colorForRow(blanco);
+        const pct = Math.max(0, Math.min(100, Number(blanco.percent)||0));
+        const tr = document.createElement("tr");
+        tr.className = "row";
+        tr.innerHTML = `
+          <td style="padding:10px 18px;">${blanco.candidate}</td>
+          <td style="text-align:center;"><span class="party-badge" style="background:${color};">${blanco.party || "O"}</span></td>
+          <td style="text-align:right; padding:10px 18px;">${blanco.votes ? formatInt(blanco.votes) : "—"}</td>
+          <td style="text-align:right; padding:10px 18px;">
+            <div style="display:inline-flex; gap:10px; align-items:center;">
+              <div class="bar-rail"><div class="bar-fill" style="width:${pct}%; background:${color};"></div></div>
+              <strong>${pct.toFixed(1)}%</strong>
+            </div>
+          </td>`;
+        tbody.appendChild(tr);
+      }
 
       document.getElementById("totalVotes").textContent = total ? formatInt(total) : "—";
       document.getElementById("ts").textContent = "Actualizado: " + nowStamp();
@@ -186,4 +175,3 @@
   </script>
 </body>
 </html>
-
