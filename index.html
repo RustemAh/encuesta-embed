@@ -12,8 +12,10 @@ body { margin:0; font-family: Arial, Roboto, sans-serif; background:#fff; }
 .hd h2 { margin:0; font-size:19px; font-weight:700; }
 .ts { font-size:12px; color:#6b7280; margin-top:4px; }
 .banner { background:#FFD400; padding:10px 16px; font-weight:700; text-transform:uppercase; border-bottom:1px solid #eee; }
+.refresh { background:#005CA9; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:600; cursor:pointer; }
+.refresh:hover { background:#004B8A; }
 
-.note { padding:10px 16px; color:#6b7280; font-size:12px; border-top:1px solid #eee; }
+.note { padding:10px 16px; color:#6b7280; font-size:12px; border-top:1px solid #eee; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
 .total { background:#fafafa; font-weight:700; }
 .winner { background:#F3F8FF; }
 .chip-winner { display:inline-flex; align-items:center; gap:4px; background:#FFD400; color:#000; border-radius:6px; padding:2px 6px; font-size:11px; font-weight:700; margin-left:6px; }
@@ -53,7 +55,10 @@ body { margin:0; font-family: Arial, Roboto, sans-serif; background:#fff; }
     <div id="totalVotes" style="font-weight:600;">—</div>
   </div>
 
-  <div class="note" id="footnote">Actualiza cada 60s · Fuente: Google Sheets</div>
+  <div class="note">
+    <div id="footnote">Actualiza cada 60 s · Fuente: Google Sheets</div>
+    <button id="refreshBtn" class="refresh" title="Actualizar ahora">🔄 Actualizar</button>
+  </div>
 </div>
 
 <script>
@@ -157,9 +162,13 @@ async function load(){
   }
 }
 
+document.getElementById("refreshBtn").addEventListener("click",()=>{
+  document.getElementById("refreshBtn").textContent="⏳ Actualizando...";
+  load().then(()=>document.getElementById("refreshBtn").textContent="🔄 Actualizar");
+});
+
 load();
 setInterval(load,REFRESH_MS);
 </script>
 </body>
 </html>
-
