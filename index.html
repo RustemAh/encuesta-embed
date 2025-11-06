@@ -8,25 +8,31 @@
     :root { color-scheme: light; }
     body { margin:0; font-family: Arial, Roboto, sans-serif; background:#fff; }
     .wrap { max-width: 720px; margin: 0 auto; border:1px solid #ddd; border-radius:10px; overflow:hidden; }
-    .hd { padding:16px 18px; border-bottom:1px solid #eee; }
-    .hd h2 { margin:0; font-size:22px; }
+    .hd { padding:16px 18px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .hd h2 { margin:0; font-size:20px; }
+    .ts { font-size:12px; color:#6b7280; }
     .banner { background:#FFD400; padding:10px 18px; font-weight:700; text-transform:uppercase; border-bottom:1px solid #eee; }
     .tbl { width:100%; border-collapse:collapse; font-size:14px; }
     .th { color:#6b7280; font-size:12px; }
     .row { border-top:1px solid #eee; }
-    .party { display:inline-block; min-width:22px; text-align:center; color:#fff; border-radius:4px; padding:2px 6px; font-weight:700; }
-    .D { background:#0A66C2; } .R { background:#D21F3C; } .O { background:#6b7280; }
+    .party-badge { display:inline-block; min-width:22px; text-align:center; color:#fff; border-radius:4px; padding:2px 6px; font-weight:700; background:#6b7280; }
     .bar-rail { position:relative; width:160px; height:10px; background:#e5e7eb; border-radius:6px; overflow:hidden; }
     .bar-fill { height:10px; border-radius:6px; }
     .note { padding:10px 18px; color:#6b7280; font-size:12px; border-top:1px solid #eee; }
     .total { background:#fafafa; font-weight:700; }
     .winner { background:#F3F8FF; }
-    @media (max-width:640px){ .bar-rail { width:120px; } }
+    @media (max-width:640px){
+      .bar-rail { width:120px; }
+      .hd h2 { font-size:18px; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap" role="group" aria-label="Resultados - Proyectado ganador">
-    <div class="hd"><h2>Presidencial Chile 2025 — Nacional</h2></div>
+    <div class="hd">
+      <h2>Presidencial Chile 2025 — Nacional</h2>
+      <div class="ts" id="ts">—</div>
+    </div>
     <div class="banner">PROYECTADO GANADOR ✓</div>
 
     <table class="tbl">
@@ -49,77 +55,120 @@
       </tfoot>
     </table>
 
-    <div class="note" id="footnote">Actualiza cada 60s</div>
+    <div class="note" id="footnote">Actualiza cada 60s · Fuente: Google Sheets</div>
   </div>
 
   <script>
-    // === CONFIGURA AQUÍ ===
-    // Opción Google Sheets (Archivo → Publicar en la web → CSV):
-    // const DATA_URL = "https://docs.google.com/spreadsheets/d/1e1hdX19TAZIiOnTfPgcCmfOh0HujEHWNEYn5WBiAFz8/export?format=csv";
-    // Opción GitHub RAW (mismo repo): sube data.csv a la raíz y usa su raw URL:
-    // const DATA_URL = "https://raw.githubusercontent.com/noticiasvalpo-creator/encuesta-embed/main/data.csv";
-    const DATA_URL = "https://raw.githubusercontent.com/noticiasvalpo-creator/encuesta-embed/main/data.csv";
-
+    // ============================================================
+    // CONFIGURA AQUÍ — Fuente: Google Sheets (CSV export)
+    // Asegúrate de publicar/compartir la hoja: Archivo → Compartir → "Cualquiera con el enlace (lector)"
+    // y preferiblemente Archivo → Publicar en la web → Hoja → CSV.
+    //
+    // Con tu ID: 1e1hdX19TAZIiOnTfPgcCmfOh0HujEHWNEYn5WBiAFz8
+    // Si no especificas gid, toma la primera hoja:
+    const DATA_URL = "https://docs.google.com/spreadsheets/d/1e1hdX19TAZIiOnTfPgcCmfOh0HujEHWNEYn5WBiAFz8/export?format=csv";
     const REFRESH_MS = 60000; // 60s
+    //
+    // Cabeceras esperadas en la hoja:
+    // candidate,party,votes,percent,highlight
+    // percent puede venir con coma decimal (ej: 18,7)
+    // votes puede venir con puntos como separador de miles (1.234.567)
+    // ============================================================
 
-    async function fetchCSV(url){
-      const bust = url.includes("?") ? "&" : "?";
-      const res = await fetch(url + bust + "t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) throw new Error("No se pudo cargar CSV");
-      return await res.text();
+    // Colores específicos por candidato (prioridad sobre 'party')
+    const candidateColorMap = {
+      "José Antonio Kast": "#005CA9",            // azul
+      "Evelyn Matthei": "#009688",               // verde teal
+      "Franco Parisi": "#8E44AD",                // morado
+      "Johannes Kaiser": "#7F8C8D",              // gris pizarra
+      "Marco Enríquez-Ominami": "#F39C12",       // naranjo
+      "Harold Mayne-Nicholls": "#27AE60",        // verde
+      "Eduardo Artés": "#95A5A6",                // gris claro
+      "Voto nulo / blanco": "#999999"            // gris neutro
+    };
+
+    function colorForRow(r){
+      if (r && r.candidate && candidateColorMap[r.candidate]) return candidateColorMap[r.candidate];
+      if (r && r.party === "D") return "#0A66C2";
+      if (r && r.party === "R") return "#D21F3C";
+      return "#6b7280"; // Otros
     }
 
+    function formatInt(n){ return (n||0).toLocaleString("es-CL"); }
+    function nowStamp(){
+      const d = new Date();
+      return d.toLocaleString("es-CL", { dateStyle:"medium", timeStyle:"short" });
+    }
+
+    // CSV parser sencillo con soporte de campos entrecomillados
     function parseCSV(text){
-      const lines = text.trim().split(/\r?\n/);
-      const headers = lines.shift().split(",").map(h=>h.trim());
-      return lines.map(line=>{
-        // Se permite coma decimal en percent: "50,4" -> 50.4
-        const cols = line.split(",").map(c=>c.trim());
+      const rows = [];
+      let cur = [], field = "", inQuotes = false;
+      for (let i=0; i<text.length; i++){
+        const c = text[i], n = text[i+1];
+        if (inQuotes){
+          if (c === '"' && n === '"'){ field += '"'; i++; }
+          else if (c === '"'){ inQuotes = false; }
+          else { field += c; }
+        } else {
+          if (c === '"'){ inQuotes = true; }
+          else if (c === ','){ cur.push(field); field=""; }
+          else if (c === '\n'){ cur.push(field); rows.push(cur); cur=[]; field=""; }
+          else if (c === '\r'){ /* skip */ }
+          else { field += c; }
+        }
+      }
+      if (field.length || cur.length) { cur.push(field); rows.push(cur); }
+      const header = rows.shift().map(h=>h.trim());
+      return rows.filter(r=>r.some(x=>String(x).trim()!=="")).map(r=>{
         const obj = {};
-        headers.forEach((h,i)=> obj[h] = cols[i] ?? "");
-        obj.votes   = Number(String(obj.votes).replace(/\./g,""));
-        obj.percent = Number(String(obj.percent).replace(",","."));
+        header.forEach((h,i)=> obj[h]= (r[i] ?? "").trim());
+        // Normalizaciones
+        obj.votes = obj.votes ? Number(String(obj.votes).replace(/\./g,"").replace(/ /g,"")) : 0;
+        obj.percent = obj.percent ? Number(String(obj.percent).replace(",", ".")) : 0;
         obj.highlight = String(obj.highlight).toLowerCase()==="true";
         return obj;
       });
     }
 
-    function formatInt(n){
-      return (n||0).toLocaleString("es-CL");
+    async function fetchCSV(url){
+      const bust = url.includes("?") ? "&" : "?";
+      const res = await fetch(url + bust + "t=" + Date.now(), { cache:"no-store" });
+      if (!res.ok) throw new Error("No se pudo cargar CSV");
+      return await res.text();
     }
 
     function render(rows){
-      // Ordenar por votos (desc)
-      rows.sort((a,b)=> (b.votes||0) - (a.votes||0));
+      // Orden por votos (desc) si hay; si no, por percent
+      rows.sort((a,b)=> (b.votes||0)-(a.votes||0) || (b.percent||0)-(a.percent||0));
       const tbody = document.getElementById("rows");
       tbody.innerHTML = "";
       let total = 0;
 
       rows.forEach((r,idx)=>{
         total += (r.votes||0);
+        const color = colorForRow(r);
+        const pct = Math.max(0, Math.min(100, Number(r.percent)||0));
         const tr = document.createElement("tr");
-        tr.className = "row" + (r.highlight || idx===0 ? " winner" : "");
+        tr.className = "row" + ((r.highlight || idx===0) ? " winner" : "");
         tr.innerHTML = `
-          <td style="padding:10px 18px;">${idx===0 ? "<b>"+r.candidate+"</b>" : r.candidate}</td>
-          <td style="text-align:center;"><span class="party ${r.party||'O'}">${r.party||'O'}</span></td>
-          <td style="text-align:right; padding:10px 18px;">${formatInt(r.votes||0)}</td>
+          <td style="padding:10px 18px;">${(r.highlight || idx===0) ? "<b>"+(r.candidate||"")+"</b>" : (r.candidate||"")}</td>
+          <td style="text-align:center;">
+            <span class="party-badge" style="background:${color};">${r.party || "O"}</span>
+          </td>
+          <td style="text-align:right; padding:10px 18px;">${r.votes ? formatInt(r.votes) : "—"}</td>
           <td style="text-align:right; padding:10px 18px;">
             <div style="display:inline-flex; gap:10px; align-items:center;">
-              <div class="bar-rail"><div class="bar-fill" style="width:${Math.max(0, Math.min(100, r.percent||0))}%; background:${partyColor(r.party)};"></div></div>
-              <strong>${(r.percent||0).toFixed(1)}%</strong>
+              <div class="bar-rail"><div class="bar-fill" style="width:${pct}%; background:${color};"></div></div>
+              <strong>${pct.toFixed(1)}%</strong>
             </div>
           </td>
         `;
         tbody.appendChild(tr);
       });
 
-      document.getElementById("totalVotes").textContent = formatInt(total);
-    }
-
-    function partyColor(p){
-      if (p==="D") return "#0A66C2";
-      if (p==="R") return "#D21F3C";
-      return "#6b7280";
+      document.getElementById("totalVotes").textContent = total ? formatInt(total) : "—";
+      document.getElementById("ts").textContent = "Actualizado: " + nowStamp();
     }
 
     async function load(){
@@ -127,10 +176,10 @@
         const text = await fetchCSV(DATA_URL);
         const rows = parseCSV(text);
         render(rows);
-        document.getElementById("footnote").textContent = "Actualiza cada " + (REFRESH_MS/1000) + "s · Fuente: CSV";
+        document.getElementById("footnote").textContent = "Actualiza cada " + (REFRESH_MS/1000) + "s · Fuente: Google Sheets (CSV)";
       }catch(e){
-        document.getElementById("footnote").textContent = "Error cargando CSV";
         console.error(e);
+        document.getElementById("footnote").textContent = "Error cargando CSV (revisa permisos de la hoja: pública o publicada).";
       }
     }
 
@@ -139,4 +188,3 @@
   </script>
 </body>
 </html>
-
