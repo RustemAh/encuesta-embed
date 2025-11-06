@@ -171,7 +171,7 @@
         const text = await fetchCSV(DATA_URL);
         const rows = parseCSV(text);
         render(rows);
-        document.getElementById("footnote").textContent = "Actualiza cada " + (REFRESH_MS/1000) + "s · Fuente: Google Sheets (CSV)";
+        document.getElementById("footnote").textContent = "Actualiza cada " + (REFRESH_MS/1000) + "s · Fuente: Servel";
       }catch(e){
         console.error(e);
         document.getElementById("footnote").textContent = "Error cargando CSV (revisa permisos de la hoja).";
