@@ -14,7 +14,7 @@
     .banner { background:#FFD400; padding:10px 18px; font-weight:700; text-transform:uppercase; border-bottom:1px solid #eee; }
     .tbl { width:100%; border-collapse:collapse; font-size:14px; }
     .th { color:#6b7280; font-size:12px; }
-    .row { border-top:1px solid #eee; }
+    .row { border-top:1px solid #eee; vertical-align:middle; }
     .party-badge { display:inline-block; min-width:22px; text-align:center; color:#fff; border-radius:4px; padding:2px 6px; font-weight:700; background:#6b7280; }
     .bar-rail { position:relative; width:160px; height:10px; background:#e5e7eb; border-radius:6px; overflow:hidden; }
     .bar-fill { height:10px; border-radius:6px; }
@@ -22,6 +22,8 @@
     .total { background:#fafafa; font-weight:700; }
     .winner { background:#F3F8FF; }
     .chip-winner { display:inline-flex; align-items:center; gap:4px; background:#FFD400; color:#000; border-radius:6px; padding:2px 6px; font-size:11px; font-weight:700; margin-left:8px; }
+    .photo { width:28px; height:28px; border-radius:50%; object-fit:cover; margin-right:8px; border:1px solid #ddd; }
+    .name-cell { display:flex; align-items:center; gap:8px; }
     @media (max-width:640px){ .bar-rail { width:120px; } .hd h2 { font-size:18px; } }
   </style>
 </head>
@@ -120,10 +122,16 @@
         const pasa = topTwo.includes(r.candidate);
         const tr = document.createElement("tr");
         tr.className = "row" + (pasa ? " winner" : "");
+        const photoHTML = r.photo ? `<img src="${r.photo}" alt="${r.candidate}" class="photo"/>` : "";
         tr.innerHTML = `
           <td style="padding:10px 18px;">
-            ${pasa ? "<b>"+r.candidate+"</b>" : r.candidate}
-            ${pasa ? `<span class='chip-winner'>✓ Pasa a segunda vuelta</span>` : ""}
+            <div class="name-cell">
+              ${photoHTML}
+              <div>
+                ${pasa ? "<b>"+r.candidate+"</b>" : r.candidate}
+                ${pasa ? `<span class='chip-winner'>✓ Pasa a segunda vuelta</span>` : ""}
+              </div>
+            </div>
           </td>
           <td style="text-align:center;"><span class="party-badge" style="background:${color};">${r.party || "O"}</span></td>
           <td style="text-align:right; padding:10px 18px;">${r.votes ? formatInt(r.votes) : "—"}</td>
@@ -175,3 +183,4 @@
   </script>
 </body>
 </html>
+
